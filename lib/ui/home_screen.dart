@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cep/models/cep_model.dart';
+import 'package:flutter_cep/repositories/cep_repository.dart';
 import 'package:flutter_cep/ui/widgets/address_widget.dart';
+import 'package:http/http.dart' as http;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,6 +12,42 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final repository = CepRepository(client: http.Client());
+  final cepController = TextEditingController();
+  String? errorMessage;
+  CepModel? address;
+
+  @override
+  void dispose() {
+    cepController.dispose();
+    super.dispose();
+  }
+
+  Future<void> buscarCep() async {
+    setState(() {
+      errorMessage = null;
+      address = null;
+    });
+    final cep = cepController.text.trim();
+    if (cep.isEmpty) {
+      setState(() {
+        errorMessage = 'Digite um CEP válido!';
+      });
+      return;
+    }
+    try {
+      final resultAdrress = await repository.consultarCep(cep);
+      setState(() {
+        errorMessage = null;
+        address = resultAdrress;
+      });
+    } on Exception catch (e) {
+      setState(() {
+        errorMessage = e.toString().replaceAll(RegExp(r'Exception:'), '');
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             TextField(
+              controller: cepController,
               keyboardType: TextInputType.number,
               maxLength: 9,
               decoration: const InputDecoration(
@@ -72,12 +112,47 @@ class _HomeScreenState extends State<HomeScreen> {
             AnimatedSwitcher(
               duration: Duration.zero,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: buscarCep,
                 label: Text('Buscar CEP'),
                 icon: Icon(Icons.search_rounded),
               ),
             ),
-            AddressWidget(),
+            Visibility(
+              visible: errorMessage != null,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.colorScheme.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      size: 24,
+                      color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(
+                      width: 12,
+                    ),
+                    Text(
+                      errorMessage ?? '',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Visibility(
+              visible: address != null,
+              child: AddressWidget(address: address),
+            ),
           ],
         ),
       ),

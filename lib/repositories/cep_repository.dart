@@ -13,7 +13,7 @@ class CepRepository {
     try {
       final cleanCep = cep.replaceAll(RegExp(r'[^0-9]'), '');
       if (cleanCep.length != 8) {
-        throw ArgumentError.value(cep, 'cep', 'CEP deve ter 8 dígitos');
+        throw Exception('CEP deve ter 8 dígitos!');
       }
 
       final url = Uri.https('viacep.com.br', '/ws/$cleanCep/json', {});
@@ -22,14 +22,14 @@ class CepRepository {
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body) as Map<String, dynamic>;
         if (jsonData['erro'] != null) {
-          throw Exception('CEP não encontrado');
+          throw Exception('CEP não encontrado!');
         }
         return CepModel.fromJson(jsonData);
       } else {
-        throw Exception('Erro na requisição');
+        throw Exception('Erro na requisição!');
       }
-    } on Exception catch (_) {
-      throw Exception('Erro ao realizar a requisição');
+    } on Exception catch (e) {
+      throw Exception(e.toString());
     }
   }
 }
