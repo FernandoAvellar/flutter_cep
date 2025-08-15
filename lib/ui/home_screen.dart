@@ -3,6 +3,7 @@ import 'package:flutter_cep/models/cep_model.dart';
 import 'package:flutter_cep/repositories/cep_repository.dart';
 import 'package:flutter_cep/ui/widgets/address_widget.dart';
 import 'package:http/http.dart' as http;
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,8 +15,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final repository = CepRepository(client: http.Client());
   final cepController = TextEditingController();
+  final cepFormatter = MaskTextInputFormatter(
+    mask: '#####-###',
+    filter: {'#': RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
   String? errorMessage;
   CepModel? address;
+  bool isLoading = false;
 
   @override
   void dispose() {
@@ -24,17 +31,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> buscarCep() async {
+    FocusScope.of(context).unfocus();
     setState(() {
       errorMessage = null;
       address = null;
+      isLoading = true;
     });
     final cep = cepController.text.trim();
     if (cep.isEmpty) {
       setState(() {
         errorMessage = 'Digite um CEP válido!';
+        isLoading = false;
       });
       return;
     }
+
     try {
       final resultAdrress = await repository.consultarCep(cep);
       setState(() {
@@ -44,6 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
     } on Exception catch (e) {
       setState(() {
         errorMessage = e.toString().replaceAll(RegExp(r'Exception:'), '');
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
       });
     }
   }
@@ -102,20 +117,27 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: cepController,
               keyboardType: TextInputType.number,
               maxLength: 9,
+              inputFormatters: [cepFormatter],
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.location_on_rounded),
                 labelText: 'CEP',
                 hintText: 'Digite o CEP (ex: 01310-100)',
                 counterText: '',
               ),
+              onSubmitted: (_) => buscarCep(),
             ),
             AnimatedSwitcher(
-              duration: Duration.zero,
-              child: ElevatedButton.icon(
-                onPressed: buscarCep,
-                label: Text('Buscar CEP'),
-                icon: Icon(Icons.search_rounded),
-              ),
+              duration: Duration(milliseconds: 300),
+              child: isLoading
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: 'Buscando CEP',
+                    )
+                  : ElevatedButton.icon(
+                      onPressed: buscarCep,
+                      label: Text('Buscar CEP'),
+                      icon: Icon(Icons.search_rounded),
+                    ),
             ),
             Visibility(
               visible: errorMessage != null,
@@ -151,7 +173,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Visibility(
               visible: address != null,
-              child: AddressWidget(address: address),
+              child: AnimatedOpacity(
+                opacity: address != null ? 1 : 0,
+                duration: Duration(milliseconds: 1000),
+                child: AddressWidget(address: address),
+              ),
             ),
           ],
         ),
